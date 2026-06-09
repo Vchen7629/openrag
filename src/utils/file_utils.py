@@ -121,6 +121,41 @@ def langflow_safe_filename_and_mimetype(filename: str, mimetype: str | None) -> 
     return filename, safe_mimetype
 
 
+def is_pdf_password_protected_bytes(content: bytes) -> bool:
+    """Return True if content is a password-protected PDF.
+
+    The PDF spec requires every encrypted document to include an /Encrypt
+    dictionary in its trailer, so scanning for b"/Encrypt" approach doesnt require
+    external dependencies. Also handles Non-PDF content with a %PDF- header check
+    and returns false so callers can let Docling handle the format error instead.
+    """
+    if len(content) < 5 or content[:5] != b"%PDF-":
+        return False
+    return b"/Encrypt" in content
+
+
+def is_pdf_password_protected_pypdf(content: bytes) -> bool:
+    """Return True if content is a password-protected PDF, using pypdf.
+
+    Malformed or non-PDF content returns False so callers can let Docling
+    surface the format error instead.
+    """
+    import io
+
+    from pypdf import PdfReader, PasswordType
+    from pypdf.errors import EmptyFileError, PdfReadError
+
+    try:
+        reader = PdfReader(io.BytesIO(content))
+        if not reader.is_encrypted:
+            return False
+        # handles owner-only pdfs that only restrict printing, copying, or editing
+        # which docling should handle fine since it just extracts text
+        return reader.decrypt("") == PasswordType.NOT_DECRYPTED
+    except (PdfReadError, EmptyFileError):
+        return False
+
+
 def get_filename_aliases(filename: str) -> list[str]:
     """Return equivalent filename variants used by ingestion/indexing.
 

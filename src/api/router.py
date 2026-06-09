@@ -14,6 +14,10 @@ from dependencies import (
     get_session_manager,
     get_task_service,
 )
+from utils.file_utils import (
+    is_pdf_password_protected_bytes,
+    is_pdf_password_protected_pypdf,
+)
 from session_manager import User
 from utils.logging_config import get_logger
 
@@ -104,6 +108,8 @@ async def _traditional_upload_ingest_task(
         try:
             for upload_file in upload_files:
                 content = await upload_file.read()
+                if is_pdf_password_protected_pypdf(content):
+                    return JSONResponse({"error": "Password-protected PDFs are not supported"}, status_code=400)
                 original_filenames.append(upload_file.filename)
                 # Generate unique temp file to avoid collisions
                 temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".tmp")
@@ -205,6 +211,8 @@ async def _langflow_upload_ingest_task(
         try:
             for upload_file in upload_files:
                 content = await upload_file.read()
+                if is_pdf_password_protected_pypdf(content):
+                    return JSONResponse({"error": "Password-protected PDFs are not supported"}, status_code=400)
                 original_filenames.append(upload_file.filename)
                 # Generate unique temp file to avoid collisions
                 temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".tmp")
